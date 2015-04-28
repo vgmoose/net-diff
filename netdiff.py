@@ -75,12 +75,51 @@ def communicate(my_value):
 def common_networking():
     print("Connected to %s!\n" % peer.getpeername()[0])
     
-    # check if the sizes are the same
+    # get the remote's file size
     size = communicate(str(len(content)))
     
-    print size
-    print str(len(content))
+    # make sure they are the same
+    if size == str(len(content)):
+#        print("Filesizes are the same! Proceeding...\n")
+        pass
+    else:
+        print("Filesizes are different. This is not supported at this time.")
+        exit();
     
+    # recursively compare md5s of each half of the bytes
+    offset = compare(content, 0)
+    
+    print("These files start to differ at offset 0x%x" % offset)
+    
+def compare(data, offset):
+    # get the middle
+    midpoint = int(len(data)/2)
+    
+    # base case, when we're down to one byte stop
+    if (len(data) == 1):
+        return offset
+    
+    # split into two halves
+    my_half1 = data[:midpoint]
+    my_half2 = data[midpoint:]
+    
+    # md5 hash each half
+    m1 = md5(my_half1)
+    m2 = md5(my_half2)
+    
+    # get and send halves hashes to peer
+    p1 = communicate(m1)
+    p2 = communicate(m2)
+    
+    # compare them
+    if m1 != p1:
+        return compare(my_half1, offset)
+    elif m2 != p2:
+        return compare(my_half2, offset+midpoint)
+    else:
+        print("These files are identical!\n")
+        exit()
+        
 
 # if client
 if isclient:
@@ -97,8 +136,11 @@ if isclient:
     
 # if host
 else:
-    print("Hosting server on our public IP (%s) on port %i" % (urllib2.urlopen('http://ip.42.pl/raw').read(), port))
-    print("Waiting for a client to connect...\n")
+    try:
+        print("Hosting server on our public IP (%s) on port %i" % (urllib2.urlopen('http://checkip.rickyayoub.com').read(), port))
+    except:
+        pass
+    print("Waiting for a client to connect...")
     
     server = socket(AF_INET, SOCK_STREAM)
 
