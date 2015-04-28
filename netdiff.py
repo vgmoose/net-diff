@@ -23,9 +23,13 @@ def md5(string):
 # first argument is required and is the file to diff
 try:
     #read all bytes into memory
-    content = bytearray(open(sys.argv[1], "rb").read())
-    print("\nLoaded %s (%i bytes) into memory!" % (os.path.basename(sys.argv[1]), len(content)))
-    print("Hash: %s\n" % md5(content))
+    size = os.path.getsize(sys.argv[1])
+    fp = open(sys.argv[1], "rb")
+    content1 = bytearray(fp.read(size/2))
+    content2 = bytearray(fp.read(size/2))
+    fp.close()
+    print("Loaded %s (%i bytes) into memory!\n" % (os.path.basename(sys.argv[1]), size))
+#    print("Hash: %s\n" % md5(content))
 except:
     usage()
 
@@ -76,10 +80,10 @@ def common_networking():
     print("Connected to %s!\n" % peer.getpeername()[0])
     
     # get the remote's file size
-    size = communicate(str(len(content)))
+    size = communicate(str(len(content1)+len(content2)))
     
     # make sure they are the same
-    if size == str(len(content)):
+    if size == str(len(content1)+len(content2)):
 #        print("Filesizes are the same! Proceeding...\n")
         pass
     else:
@@ -87,38 +91,59 @@ def common_networking():
         exit();
     
     # recursively compare md5s of each half of the bytes
-    offset = compare(content, 0)
+    offset = compare(0)
     
     print("These files start to differ at offset 0x%x" % offset)
     
-def compare(data, offset):
+def compare(offset):
+    global content1, content2
+    
+    my_half1 = content1
+    my_half2 = content2
+    
+    del content1
+    del content2
+    
+    # md5 hash each half
+    m1 = md5(my_half1)
+    m2 = md5(my_half2)
+        
+    # get and send halves hashes to peer
+    p1 = communicate(m1)
+    p2 = communicate(m2)
+    
+    # set the target data (first or second half)
+    if m1 != p1:
+        data = my_half1
+        tmpoffset = 0
+    elif m2 != p2:
+        data = my_half2
+        tmpoffset = len(my_half1)
+    else:
+        print("These files are identical!\n")
+        exit()
+    
+    # free up memory
+    del my_half1
+    del my_half2
+    
     # get the middle
     midpoint = int(len(data)/2)
     
     # base case, when we're down to one byte stop
     if (len(data) == 1):
-        return offset
+        return offset+tmpoffset
     
-    # split into two halves
-    my_half1 = data[:midpoint]
-    my_half2 = data[midpoint:]
+    # split the list and free up more memory
+    content1 = data[:midpoint]
+    content2 = data[midpoint:]
+    del data
     
-    # md5 hash each half
-    m1 = md5(my_half1)
-    m2 = md5(my_half2)
-    
-    # get and send halves hashes to peer
-    p1 = communicate(m1)
-    p2 = communicate(m2)
+#    # garbage collect
+#    gc.collect()
     
     # compare them
-    if m1 != p1:
-        return compare(my_half1, offset)
-    elif m2 != p2:
-        return compare(my_half2, offset+midpoint)
-    else:
-        print("These files are identical!\n")
-        exit()
+    return compare(offset+tmpoffset)
         
 
 # if client
