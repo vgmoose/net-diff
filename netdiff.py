@@ -6,6 +6,7 @@ from socket import *
 # default port
 port = 3823
 host = False
+isclient = False
 
 chunk = 9999
 
@@ -34,6 +35,7 @@ if (len(sys.argv) > 2):
         port = int(sys.argv[2])
     except:
         host = sys.argv[2]
+        isclient = True
         
 # third argument can only be a port
 if (len(sys.argv) > 3):
@@ -55,18 +57,43 @@ if (len(sys.argv) > 3):
 # ascii support (render text like diff does)
 # work on files of arbitrary sizes, not just the same
 
-def communicate(peer, isclient):
-    pass
+# communicate will send then receive or receive then send depending on the isclient variable
+def communicate(my_value):
+    # client sends second
+    if isclient:
+        peer_value = peer.recv(chunk)
+        peer.send(my_value)
+    # server sends first
+    else:
+        peer.send(my_value)
+        peer_value = peer.recv(chunk)
+    
+    # return the peer's value
+    return peer_value
+
+# common networking code
+def common_networking():
+    print("Connected to %s!\n" % peer.getpeername()[0])
+    
+    # check if the sizes are the same
+    size = communicate(str(len(content)))
+    
+    print size
+    print str(len(content))
     
 
 # if client
-if host:
+if isclient:
     print("Trying to connect to %s on port %i..." % (host, port))
+                    
+    try:
+        peer = socket(AF_INET, SOCK_STREAM)
+        peer.connect((host, port))
+    except:
+        print("Error: No server found at %s" % host)
+        exit()
     
-    s = socket(AF_INET, SOCK_STREAM)
-    s.connect((host, port))
-    
-    communicate(s, True)
+    common_networking()
     
 # if host
 else:
@@ -77,7 +104,7 @@ else:
 
     server.bind(('', port))
     server.listen(0)
-    conn, host = server.accept()
+    peer, addr = server.accept()
     
-    communicate(conn, False)
+    common_networking()
     
